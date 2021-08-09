@@ -103,12 +103,21 @@ def create_ad_hoc_field(cls, db_type):
     return getattr(orm_fields, name)()
 ModelBase.create_ad_hoc_field = create_ad_hoc_field
 
+import os
 from six import PY3, string_types
 def _send(self, data, settings=None, stream=False):
     if PY3 and isinstance(data, string_types):
         data = data.encode('utf-8')
     params = self._build_params(settings)
-    r = self.request_session.post(self.db_url, params=params, data=data, stream=stream, timeout=self.timeout)
+
+    ssl_verify = None
+    ssl_use_cert = (os.environ.get("CLICKHOUSE_SSL_USE_CERT") or "").lower() == "true"
+    if self.db_url.lower().startswith("https://") and ssl_use_cert:
+        ssl_verify = os.environ.get("CLICKHOUSE_SSL_CERT_PATH") or None
+
+    r = self.request_session.post(
+        self.db_url, params=params, data=data, stream=stream, timeout=self.timeout, verify=ssl_verify
+    )
     if r.status_code != 200:
         raise Exception(r.text)
     return r
